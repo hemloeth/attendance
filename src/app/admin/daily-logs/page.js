@@ -13,13 +13,7 @@ export default function DailyLogs() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (session && session.user.role === 'admin') {
-      fetchDailyLogs();
-    }
-  }, [session, selectedDate, fetchDailyLogs]);
-
-  const fetchDailyLogs = useCallback(async () => {
+  const fetchDailyLogs = async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/admin/daily-logs?date=${selectedDate}`);
@@ -31,7 +25,13 @@ export default function DailyLogs() {
       console.error('Error fetching daily logs:', error);
     }
     setLoading(false);
-  }, [selectedDate]);
+  };
+
+  useEffect(() => {
+    if (session?.user?.role === 'admin') {
+      fetchDailyLogs();
+    }
+  }, [session, selectedDate]);
 
   const downloadCSV = () => {
     const headers = ['Employee Name', 'Email', 'Start Time', 'End Time', 'Duration', 'Status'];
@@ -125,7 +125,7 @@ export default function DailyLogs() {
     );
   }
 
-  if (!session || session.user.role !== 'admin') {
+  if (!session?.user?.role || session.user.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

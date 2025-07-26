@@ -13,13 +13,7 @@ export default function MonthlyReports() {
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (session && session.user.role === 'admin') {
-      fetchMonthlyReports();
-    }
-  }, [session, selectedMonth, fetchMonthlyReports]);
-
-  const fetchMonthlyReports = useCallback(async () => {
+  const fetchMonthlyReports = async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/admin/monthly-reports?month=${selectedMonth}`);
@@ -31,7 +25,13 @@ export default function MonthlyReports() {
       console.error('Error fetching monthly reports:', error);
     }
     setLoading(false);
-  }, [selectedMonth]);
+  };
+
+  useEffect(() => {
+    if (session?.user?.role === 'admin') {
+      fetchMonthlyReports();
+    }
+  }, [session, selectedMonth]);
 
   const downloadCSV = () => {
     const headers = ['Employee Name', 'Email', 'Total Days', 'Total Hours', 'Average Hours/Day'];
@@ -213,7 +213,7 @@ export default function MonthlyReports() {
     );
   }
 
-  if (!session || session.user.role !== 'admin') {
+  if (!session?.user?.role || session.user.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
