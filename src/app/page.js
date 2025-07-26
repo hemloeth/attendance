@@ -6,19 +6,13 @@ import { format } from 'date-fns';
 import Image from 'next/image';
 
 export default function Home() {
-  const { data: session, status, update } = useSession();
+  const { data: session, status } = useSession();
   const [todayLog, setTodayLog] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (session) {
-      fetchTodayLog();
-    }
-  }, [session, fetchTodayLog]);
-
-  const fetchTodayLog = useCallback(async () => {
+  const fetchTodayLog = async () => {
     try {
       const response = await fetch('/api/work/logs?limit=1');
       const data = await response.json();
@@ -35,7 +29,13 @@ export default function Home() {
       console.error('Error fetching today log:', error);
       setError('Failed to load work data. Please try again.');
     }
-  }, []);
+  };
+
+  useEffect(() => {
+    if (session) {
+      fetchTodayLog();
+    }
+  }, [session]);
 
   const startWork = async () => {
     setLoading(true);
