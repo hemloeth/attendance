@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
 import WorkLog from '@/models/WorkLog';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '../../auth/[...nextauth]/route';
 
 export async function GET(request) {
   try {
