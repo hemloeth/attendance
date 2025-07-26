@@ -181,73 +181,86 @@ export default function Home() {
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                Today&apos;s Work Session
-              </h2>
-              
-              {message && (
-                <div className={`mb-4 p-3 rounded-md ${
-                  message.includes('Error') 
-                    ? 'bg-red-50 text-red-700' 
-                    : 'bg-green-50 text-green-700'
-                }`}>
-                  {message}
+              {session?.user?.role === 'admin' ? (
+                <div className="text-center py-8">
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">
+                    Welcome, Admin!
+                  </h2>
+                  <p className="text-gray-500 mb-6">
+                    Use the admin panel below to view attendance reports and manage employee data.
+                  </p>
                 </div>
-              )}
-
-              <div className="space-y-4">
-                {todayLog ? (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Start Time</p>
-                        <p className="text-lg text-gray-900">
-                          {format(new Date(todayLog.startTime), 'HH:mm:ss')}
-                        </p>
-                      </div>
-                      {todayLog.endTime && (
-                        <>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">End Time</p>
-                            <p className="text-lg text-gray-900">
-                              {format(new Date(todayLog.endTime), 'HH:mm:ss')}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Duration</p>
-                            <p className="text-lg text-gray-900">
-                              {Math.floor(todayLog.duration / 60)}h {todayLog.duration % 60}m
-                            </p>
-                          </div>
-                        </>
-                      )}
+              ) : (
+                <>
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">
+                    Today&apos;s Work Session
+                  </h2>
+                  
+                  {message && (
+                    <div className={`mb-4 p-3 rounded-md ${
+                      message.includes('Error') 
+                        ? 'bg-red-50 text-red-700' 
+                        : 'bg-green-50 text-green-700'
+                    }`}>
+                      {message}
                     </div>
-                    
-                    {!todayLog.endTime && (
-                      <div className="mt-4">
+                  )}
+
+                  <div className="space-y-4">
+                    {todayLog ? (
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Start Time</p>
+                            <p className="text-lg text-gray-900">
+                              {format(new Date(todayLog.startTime), 'HH:mm:ss')}
+                            </p>
+                          </div>
+                          {todayLog.endTime && (
+                            <>
+                              <div>
+                                <p className="text-sm font-medium text-gray-500">End Time</p>
+                                <p className="text-lg text-gray-900">
+                                  {format(new Date(todayLog.endTime), 'HH:mm:ss')}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-500">Duration</p>
+                                <p className="text-lg text-gray-900">
+                                  {Math.floor(todayLog.duration / 60)}h {todayLog.duration % 60}m
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        
+                        {!todayLog.endTime && (
+                          <div className="mt-4">
+                            <button
+                              onClick={endWork}
+                              disabled={loading}
+                              className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {loading ? 'Ending...' : 'End Work'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500 mb-4">No work session started today</p>
                         <button
-                          onClick={endWork}
+                          onClick={startWork}
                           disabled={loading}
-                          className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50"
+                          className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
                         >
-                          {loading ? 'Ending...' : 'End Work'}
+                          {loading ? 'Starting...' : 'Start Work'}
                         </button>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 mb-4">No work session started today</p>
-                    <button
-                      onClick={startWork}
-                      disabled={loading}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {loading ? 'Starting...' : 'Start Work'}
-                    </button>
-                  </div>
-                )}
-              </div>
+                </>
+              )}
 
               {session?.user?.role === 'admin' && (
                 <div className="mt-8 pt-8 border-t border-gray-200">
