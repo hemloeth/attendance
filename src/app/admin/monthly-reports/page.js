@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
@@ -17,9 +17,9 @@ export default function MonthlyReports() {
     if (session && session.user.role === 'admin') {
       fetchMonthlyReports();
     }
-  }, [session, selectedMonth]);
+  }, [session, selectedMonth, fetchMonthlyReports]);
 
-  const fetchMonthlyReports = async () => {
+  const fetchMonthlyReports = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/admin/monthly-reports?month=${selectedMonth}`);
@@ -31,7 +31,7 @@ export default function MonthlyReports() {
       console.error('Error fetching monthly reports:', error);
     }
     setLoading(false);
-  };
+  }, [selectedMonth]);
 
   const downloadCSV = () => {
     const headers = ['Employee Name', 'Email', 'Total Days', 'Total Hours', 'Average Hours/Day'];

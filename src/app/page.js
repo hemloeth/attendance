@@ -1,8 +1,9 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
+import Image from 'next/image';
 
 export default function Home() {
   const { data: session, status, update } = useSession();
@@ -14,9 +15,9 @@ export default function Home() {
     if (session) {
       fetchTodayLog();
     }
-  }, [session]);
+  }, [session, fetchTodayLog]);
 
-  const fetchTodayLog = async () => {
+  const fetchTodayLog = useCallback(async () => {
     try {
       const response = await fetch('/api/work/logs?limit=1');
       const data = await response.json();
@@ -32,7 +33,7 @@ export default function Home() {
     } catch (error) {
       console.error('Error fetching today log:', error);
     }
-  };
+  }, []);
 
   const startWork = async () => {
     setLoading(true);
@@ -128,10 +129,12 @@ export default function Home() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 {session.user.image && (
-                  <img
+                  <Image
                     className="h-8 w-8 rounded-full"
                     src={session.user.image}
                     alt={session.user.name}
+                    width={32}
+                    height={32}
                   />
                 )}
                 <span className="text-sm text-gray-700">{session.user.name}</span>
@@ -152,7 +155,7 @@ export default function Home() {
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">
-                Today's Work Session
+                Today&apos;s Work Session
               </h2>
               
               {message && (

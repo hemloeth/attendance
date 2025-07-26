@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
@@ -17,9 +17,9 @@ export default function DailyLogs() {
     if (session && session.user.role === 'admin') {
       fetchDailyLogs();
     }
-  }, [session, selectedDate]);
+  }, [session, selectedDate, fetchDailyLogs]);
 
-  const fetchDailyLogs = async () => {
+  const fetchDailyLogs = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/admin/daily-logs?date=${selectedDate}`);
@@ -31,7 +31,7 @@ export default function DailyLogs() {
       console.error('Error fetching daily logs:', error);
     }
     setLoading(false);
-  };
+  }, [selectedDate]);
 
   const downloadCSV = () => {
     const headers = ['Employee Name', 'Email', 'Start Time', 'End Time', 'Duration', 'Status'];
