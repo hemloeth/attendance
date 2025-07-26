@@ -4,7 +4,7 @@ import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
 
 const authOptions = {
-
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -35,7 +35,13 @@ const authOptions = {
     },
     async session({ session, token }) {
       try {
-        if (token.userId) {
+        console.log('Session callback - Token data:', {
+          hasUserId: !!token.userId,
+          hasRole: !!token.role,
+          email: token.email
+        });
+        
+        if (token.userId && token.role) {
           session.user.id = token.userId;
           session.user.role = token.role;
           console.log('Session updated from token - User ID:', token.userId, 'Role:', token.role);
@@ -59,6 +65,12 @@ const authOptions = {
           session.user.role = 'user';
         }
         
+        console.log('Final session data:', {
+          hasUserId: !!session.user.id,
+          hasRole: !!session.user.role,
+          email: session.user.email
+        });
+        
         return session;
       } catch (error) {
         console.error('Error in session callback:', error);
@@ -68,28 +80,34 @@ const authOptions = {
       }
     },
     async jwt({ token, user, account }) {
-      if (account && user) {
-        await dbConnect();
-        const dbUser = await User.findOne({ email: user.email });
-        if (dbUser) {
-          token.userId = dbUser._id.toString();
-          token.role = dbUser.role;
-          console.log('JWT updated with user ID:', dbUser._id);
+      try {
+        // Initial sign in
+        if (account && user) {
+          await dbConnect();
+          const dbUser = await User.findOne({ email: user.email });
+          if (dbUser) {
+            token.userId = dbUser._id.toString();
+            token.role = dbUser.role;
+            console.log('JWT updated with user ID:', dbUser._id);
+          }
         }
-      }
-      
-      // Also update on subsequent calls if we have the email
-      if (token.email && !token.userId) {
-        await dbConnect();
-        const dbUser = await User.findOne({ email: token.email });
-        if (dbUser) {
-          token.userId = dbUser._id.toString();
-          token.role = dbUser.role;
-          console.log('JWT updated on subsequent call - User ID:', dbUser._id);
+        
+        // Subsequent calls - ensure we always have user data
+        if (token.email && (!token.userId || !token.role)) {
+          await dbConnect();
+          const dbUser = await User.findOne({ email: token.email });
+          if (dbUser) {
+            token.userId = dbUser._id.toString();
+            token.role = dbUser.role;
+            console.log('JWT updated on subsequent call - User ID:', dbUser._id);
+          }
         }
+        
+        return token;
+      } catch (error) {
+        console.error('Error in JWT callback:', error);
+        return token;
       }
-      
-      return token;
     },
   },
   pages: {

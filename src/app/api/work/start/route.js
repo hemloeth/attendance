@@ -9,8 +9,19 @@ export async function POST() {
   try {
     const session = await getServerSession();
     
+    console.log('Session received:', {
+      hasSession: !!session,
+      userEmail: session?.user?.email,
+      userId: session?.user?.id,
+      userRole: session?.user?.role
+    });
+    
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!session.user.email) {
+      return NextResponse.json({ error: 'User email not found in session' }, { status: 400 });
     }
 
     await dbConnect();
