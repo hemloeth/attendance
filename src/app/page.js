@@ -11,6 +11,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState(null);
+  const [showWeekOffModal, setShowWeekOffModal] = useState(false);
+  const [weekOffDates, setWeekOffDates] = useState({
+    startDate: '',
+    endDate: ''
+  });
 
   const fetchTodayLog = async () => {
     try {
@@ -81,6 +86,34 @@ export default function Home() {
       }
     } catch (error) {
       setMessage('Error ending work');
+    }
+    setLoading(false);
+  };
+
+  const markWeekOff = async () => {
+    setLoading(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/work/week-off', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(weekOffDates),
+      });
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage(data.message);
+        setShowWeekOffModal(false);
+        setWeekOffDates({ startDate: '', endDate: '' });
+        // Refresh today's log to show updated status
+        fetchTodayLog();
+      } else {
+        setMessage(data.error);
+      }
+    } catch (error) {
+      setMessage('Error marking week off');
     }
     setLoading(false);
   };
@@ -209,41 +242,54 @@ export default function Home() {
                   <div className="space-y-4">
                     {todayLog ? (
                       <div className="bg-gray-50 p-4 rounded-lg">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Start Time</p>
-                            <p className="text-lg text-gray-900">
-                              {format(new Date(todayLog.startTime), 'HH:mm:ss')}
+                        {todayLog.status === 'week_off' ? (
+                          <div className="text-center">
+                            <div className="text-orange-600 text-lg font-medium mb-2">
+                              🏖️ Week Off
+                            </div>
+                            <p className="text-gray-600">
+                              You are marked as unavailable for today
                             </p>
                           </div>
-                          {todayLog.endTime && (
-                            <>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               <div>
-                                <p className="text-sm font-medium text-gray-500">End Time</p>
+                                <p className="text-sm font-medium text-gray-500">Start Time</p>
                                 <p className="text-lg text-gray-900">
-                                  {format(new Date(todayLog.endTime), 'HH:mm:ss')}
+                                  {format(new Date(todayLog.startTime), 'HH:mm:ss')}
                                 </p>
                               </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500">Duration</p>
-                                <p className="text-lg text-gray-900">
-                                  {Math.floor(todayLog.duration / 60)}h {todayLog.duration % 60}m
-                                </p>
+                              {todayLog.endTime && (
+                                <>
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-500">End Time</p>
+                                    <p className="text-lg text-gray-900">
+                                      {format(new Date(todayLog.endTime), 'HH:mm:ss')}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-500">Duration</p>
+                                    <p className="text-lg text-gray-900">
+                                      {Math.floor(todayLog.duration / 60)}h {todayLog.duration % 60}m
+                                    </p>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            
+                            {!todayLog.endTime && (
+                              <div className="mt-4">
+                                <button
+                                  onClick={endWork}
+                                  disabled={loading}
+                                  className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50"
+                                >
+                                  {loading ? 'Ending...' : 'End Work'}
+                                </button>
                               </div>
-                            </>
-                          )}
-                        </div>
-                        
-                        {!todayLog.endTime && (
-                          <div className="mt-4">
-                            <button
-                              onClick={endWork}
-                              disabled={loading}
-                              className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50"
-                            >
-                              {loading ? 'Ending...' : 'End Work'}
-                            </button>
-                          </div>
+                            )}
+                          </>
                         )}
                       </div>
                     ) : (
@@ -260,6 +306,25 @@ export default function Home() {
                     )}
                   </div>
                 </>
+              )}
+
+              {/* Week Off Section - Only for regular users */}
+              {session?.user?.role !== 'admin' && (
+                <div className="mt-8 pt-8 border-t border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    Request Time Off
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Mark yourself as unavailable for a specific period (vacation, sick leave, etc.)
+                  </p>
+                  <button
+                    onClick={() => setShowWeekOffModal(true)}
+                    disabled={loading}
+                    className="bg-orange-600 text-white px-6 py-2 rounded-md hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    Mark Week Off
+                  </button>
+                </div>
               )}
 
               {session?.user?.role === 'admin' && (
@@ -287,6 +352,65 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* Week Off Modal */}
+      {showWeekOffModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Mark Week Off
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    id="startDate"
+                    value={weekOffDates.startDate}
+                    onChange={(e) => setWeekOffDates({...weekOffDates, startDate: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    id="endDate"
+                    value={weekOffDates.endDate}
+                    onChange={(e) => setWeekOffDates({...weekOffDates, endDate: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    min={weekOffDates.startDate || new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={markWeekOff}
+                    disabled={loading || !weekOffDates.startDate || !weekOffDates.endDate}
+                    className="flex-1 bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {loading ? 'Processing...' : 'Mark Week Off'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowWeekOffModal(false);
+                      setWeekOffDates({ startDate: '', endDate: '' });
+                    }}
+                    className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
