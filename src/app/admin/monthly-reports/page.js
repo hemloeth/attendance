@@ -34,16 +34,39 @@ export default function MonthlyReports() {
   }, [session, selectedMonth]);
 
   const downloadCSV = () => {
-    const headers = ['Employee Name', 'Email', 'Total Days', 'Total Hours', 'Average Hours/Day'];
+    const headers = [
+      'Employee Name', 
+      'Email', 
+      'Total Days Worked', 
+      'Total Hours', 
+      'Average Hours/Day',
+      'Total Minutes',
+      'Working Days in Month',
+      'Attendance Rate (%)',
+      'Total Work Sessions',
+      'Completed Sessions',
+      'Incomplete Sessions'
+    ];
     const csvContent = [
       headers.join(','),
-      ...reports.map(report => [
-        `"${report.userName}"`,
-        `"${report.userEmail}"`,
-        report.totalDays,
-        report.totalHours,
-        report.averageHoursPerDay
-      ].join(','))
+      ...reports.map(report => {
+        const workingDaysInMonth = new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate();
+        const attendanceRate = (report.totalDays / workingDaysInMonth) * 100;
+        
+        return [
+          `"${report.userName}"`,
+          `"${report.userEmail}"`,
+          report.totalDays,
+          report.totalHours,
+          report.averageHoursPerDay,
+          Math.round(report.totalHours * 60),
+          workingDaysInMonth,
+          Math.round(attendanceRate * 100) / 100,
+          report.workLogs ? report.workLogs.length : 0,
+          report.workLogs ? report.workLogs.filter(log => log.endTime).length : 0,
+          report.workLogs ? report.workLogs.filter(log => !log.endTime).length : 0
+        ].join(',');
+      })
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -59,33 +82,94 @@ export default function MonthlyReports() {
     // Create workbook
     const wb = XLSX.utils.book_new();
     
-    // Summary sheet
+    // Summary sheet with salary slip information
     const summaryData = reports.map(report => ({
       'Employee Name': report.userName,
       'Email': report.userEmail,
-      'Total Days': report.totalDays,
+      'Total Days Worked': report.totalDays,
       'Total Hours': report.totalHours,
-      'Average Hours/Day': report.averageHoursPerDay
+      'Average Hours/Day': report.averageHoursPerDay,
+      'Total Minutes': Math.round(report.totalHours * 60),
+      'Working Days in Month': new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate(),
+      'Attendance Rate (%)': Math.round((report.totalDays / new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate()) * 100),
+      'Total Work Sessions': report.workLogs ? report.workLogs.length : 0,
+      'Completed Sessions': report.workLogs ? report.workLogs.filter(log => log.endTime).length : 0,
+      'Incomplete Sessions': report.workLogs ? report.workLogs.filter(log => !log.endTime).length : 0
     }));
     
     const summaryWS = XLSX.utils.json_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(wb, summaryWS, 'Summary');
+    XLSX.utils.book_append_sheet(wb, summaryWS, 'Salary Summary');
     
-    // Detailed sheets for each employee
+    // Salary calculation sheet
+    const salaryData = reports.map(report => {
+      const totalMinutes = Math.round(report.totalHours * 60);
+      const workingDaysInMonth = new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate();
+      const attendanceRate = (report.totalDays / workingDaysInMonth) * 100;
+      
+      return {
+        'Employee Name': report.userName,
+        'Email': report.userEmail,
+        'Total Days Worked': report.totalDays,
+        'Working Days in Month': workingDaysInMonth,
+        'Attendance Rate (%)': Math.round(attendanceRate * 100) / 100,
+        'Total Hours': report.totalHours,
+        'Total Minutes': totalMinutes,
+        'Average Hours/Day': report.averageHoursPerDay,
+        'Total Work Sessions': report.workLogs ? report.workLogs.length : 0,
+        'Completed Sessions': report.workLogs ? report.workLogs.filter(log => log.endTime).length : 0,
+        'Incomplete Sessions': report.workLogs ? report.workLogs.filter(log => !log.endTime).length : 0,
+        'Salary Calculation Notes': `Based on ${report.totalDays} days worked out of ${workingDaysInMonth} working days (${Math.round(attendanceRate * 100) / 100}% attendance)`
+      };
+    });
+    
+    const salaryWS = XLSX.utils.json_to_sheet(salaryData);
+    XLSX.utils.book_append_sheet(wb, salaryWS, 'Salary Calculation');
+    
+    // Detailed daily logs for each employee
     reports.forEach(report => {
       if (report.workLogs && report.workLogs.length > 0) {
-        const detailedData = report.workLogs.map(log => ({
+        const detailedData = report.workLogs.map((log, index) => ({
+          'Day': index + 1,
           'Date': log.date,
-          'Start Time': format(new Date(log.startTime), 'HH:mm'),
-          'End Time': log.endTime ? format(new Date(log.endTime), 'HH:mm') : '-',
-          'Duration (minutes)': log.duration,
-          'Duration (hours)': `${Math.floor(log.duration / 60)}h ${log.duration % 60}m`
+          'Day of Week': format(new Date(log.startTime), 'EEEE'),
+          'Start Time': format(new Date(log.startTime), 'HH:mm:ss'),
+          'End Time': log.endTime ? format(new Date(log.endTime), 'HH:mm:ss') : 'Not Ended',
+          'Duration (minutes)': log.duration || 0,
+          'Duration (hours)': log.duration ? `${Math.floor(log.duration / 60)}h ${log.duration % 60}m` : 'Not Calculated',
+          'Status': log.endTime ? 'Completed' : 'In Progress',
+          'Session ID': log._id || `Session-${index + 1}`,
+          'Notes': log.endTime ? 'Full day completed' : 'Session not ended'
         }));
         
         const detailedWS = XLSX.utils.json_to_sheet(detailedData);
         XLSX.utils.book_append_sheet(wb, detailedWS, report.userName.substring(0, 31)); // Excel sheet names limited to 31 chars
       }
     });
+    
+    // All employees combined daily log
+    const allLogsData = [];
+    reports.forEach(report => {
+      if (report.workLogs && report.workLogs.length > 0) {
+        report.workLogs.forEach(log => {
+          allLogsData.push({
+            'Employee Name': report.userName,
+            'Email': report.userEmail,
+            'Date': log.date,
+            'Day of Week': format(new Date(log.startTime), 'EEEE'),
+            'Start Time': format(new Date(log.startTime), 'HH:mm:ss'),
+            'End Time': log.endTime ? format(new Date(log.endTime), 'HH:mm:ss') : 'Not Ended',
+            'Duration (minutes)': log.duration || 0,
+            'Duration (hours)': log.duration ? `${Math.floor(log.duration / 60)}h ${log.duration % 60}m` : 'Not Calculated',
+            'Status': log.endTime ? 'Completed' : 'In Progress'
+          });
+        });
+      }
+    });
+    
+    if (allLogsData.length > 0) {
+      const allLogsWS = XLSX.utils.json_to_sheet(allLogsData);
+      XLSX.utils.book_append_sheet(wb, allLogsWS, 'All Daily Logs');
+    }
     
     // Save the file
     XLSX.writeFile(wb, `monthly-report-${selectedMonth}.xlsx`);
