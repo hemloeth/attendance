@@ -10,6 +10,7 @@ export default function Home() {
   const [todayLog, setTodayLog] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (session) {
@@ -32,6 +33,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error fetching today log:', error);
+      setError('Failed to load work data. Please try again.');
     }
   }, []);
 
@@ -91,6 +93,31 @@ export default function Home() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-8">
+          <div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Error
+            </h2>
+            <p className="mt-2 text-center text-sm text-red-600">
+              {error}
+            </p>
+          </div>
+          <div className="mt-8 space-y-6">
+            <button
+              onClick={() => window.location.reload()}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -116,8 +143,9 @@ export default function Home() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
+  try {
+    return (
+      <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -128,16 +156,16 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                {session.user.image && (
+                {session?.user?.image && (
                   <Image
                     className="h-8 w-8 rounded-full"
                     src={session.user.image}
-                    alt={session.user.name}
+                    alt={session.user.name || 'User'}
                     width={32}
                     height={32}
                   />
                 )}
-                <span className="text-sm text-gray-700">{session.user.name}</span>
+                <span className="text-sm text-gray-700">{session?.user?.name || 'User'}</span>
               </div>
               <button
                 onClick={() => signOut()}
@@ -222,7 +250,7 @@ export default function Home() {
                 )}
               </div>
 
-              {session.user.role === 'admin' && (
+              {session?.user?.role === 'admin' && (
                 <div className="mt-8 pt-8 border-t border-gray-200">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
                     Admin Panel
@@ -249,4 +277,29 @@ export default function Home() {
       </main>
     </div>
   );
+  } catch (error) {
+    console.error('Component error:', error);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-8">
+          <div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Something went wrong
+            </h2>
+            <p className="mt-2 text-center text-sm text-red-600">
+              Please refresh the page or try again later.
+            </p>
+          </div>
+          <div className="mt-8 space-y-6">
+            <button
+              onClick={() => window.location.reload()}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }

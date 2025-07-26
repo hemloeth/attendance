@@ -34,24 +34,38 @@ const authOptions = {
       return true;
     },
     async session({ session, token }) {
-      if (token.userId) {
-        session.user.id = token.userId;
-        session.user.role = token.role;
-        console.log('Session updated from token - User ID:', token.userId, 'Role:', token.role);
-      } else {
-        // Fallback: query database directly
-        await dbConnect();
-        const user = await User.findOne({ email: session.user.email });
-        if (user) {
-          session.user.id = user._id.toString();
-          session.user.role = user.role;
-          console.log('Session updated from database - User ID:', user._id, 'Role:', user.role);
+      try {
+        if (token.userId) {
+          session.user.id = token.userId;
+          session.user.role = token.role;
+          console.log('Session updated from token - User ID:', token.userId, 'Role:', token.role);
         } else {
-          console.error('User not found in database:', session.user.email);
+          // Fallback: query database directly
+          await dbConnect();
+          const user = await User.findOne({ email: session.user.email });
+          if (user) {
+            session.user.id = user._id.toString();
+            session.user.role = user.role;
+            console.log('Session updated from database - User ID:', user._id, 'Role:', user.role);
+          } else {
+            console.error('User not found in database:', session.user.email);
+            // Set default role to prevent client-side errors
+            session.user.role = 'user';
+          }
         }
+        
+        // Ensure we always have a role
+        if (!session.user.role) {
+          session.user.role = 'user';
+        }
+        
+        return session;
+      } catch (error) {
+        console.error('Error in session callback:', error);
+        // Return session with default values to prevent client-side errors
+        session.user.role = session.user.role || 'user';
+        return session;
       }
-      
-      return session;
     },
     async jwt({ token, user, account }) {
       if (account && user) {
