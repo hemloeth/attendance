@@ -13,6 +13,41 @@ export default function MonthlyReports() {
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [loading, setLoading] = useState(false);
 
+  // Helper function to group consecutive week off days into periods
+  const getWeekOffPeriods = (weekOffLogs) => {
+    if (!weekOffLogs || weekOffLogs.length === 0) return 'None';
+    
+    const sortedLogs = weekOffLogs.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const periods = [];
+    let currentPeriod = {
+      start: sortedLogs[0].date,
+      end: sortedLogs[0].date
+    };
+    
+    for (let i = 1; i < sortedLogs.length; i++) {
+      const currentDate = new Date(sortedLogs[i].date);
+      const prevDate = new Date(sortedLogs[i - 1].date);
+      const diffDays = (currentDate - prevDate) / (1000 * 60 * 60 * 24);
+      
+      if (diffDays === 1) {
+        // Consecutive day, extend current period
+        currentPeriod.end = sortedLogs[i].date;
+      } else {
+        // Non-consecutive, save current period and start new one
+        periods.push(`${currentPeriod.start} to ${currentPeriod.end}`);
+        currentPeriod = {
+          start: sortedLogs[i].date,
+          end: sortedLogs[i].date
+        };
+      }
+    }
+    
+    // Add the last period
+    periods.push(`${currentPeriod.start} to ${currentPeriod.end}`);
+    
+    return periods.join('; ');
+  };
+
   const fetchMonthlyReports = async () => {
     setLoading(true);
     try {
@@ -45,13 +80,17 @@ export default function MonthlyReports() {
       'Attendance Rate (%)',
       'Total Work Sessions',
       'Completed Sessions',
-      'Incomplete Sessions'
+      'Incomplete Sessions',
+      'Week Off Days',
+      'Week Off Periods'
     ];
     const csvContent = [
       headers.join(','),
       ...reports.map(report => {
         const workingDaysInMonth = new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate();
         const attendanceRate = (report.totalDays / workingDaysInMonth) * 100;
+        const weekOffLogs = report.workLogs ? report.workLogs.filter(log => log.status === 'week_off') : [];
+        const workLogs = report.workLogs ? report.workLogs.filter(log => log.status !== 'week_off') : [];
         
         return [
           `"${report.userName}"`,
@@ -62,9 +101,11 @@ export default function MonthlyReports() {
           Math.round(report.totalHours * 60),
           workingDaysInMonth,
           Math.round(attendanceRate * 100) / 100,
-          report.workLogs ? report.workLogs.length : 0,
-          report.workLogs ? report.workLogs.filter(log => log.endTime).length : 0,
-          report.workLogs ? report.workLogs.filter(log => !log.endTime).length : 0
+          workLogs.length,
+          workLogs.filter(log => log.endTime).length,
+          workLogs.filter(log => !log.endTime).length,
+          weekOffLogs.length,
+          `"${getWeekOffPeriods(weekOffLogs)}"`
         ].join(',');
       })
     ].join('\n');
@@ -83,19 +124,26 @@ export default function MonthlyReports() {
     const wb = XLSX.utils.book_new();
     
     // Summary sheet with salary slip information
-    const summaryData = reports.map(report => ({
-      'Employee Name': report.userName,
-      'Email': report.userEmail,
-      'Total Days Worked': report.totalDays,
-      'Total Hours': report.totalHours,
-      'Average Hours/Day': report.averageHoursPerDay,
-      'Total Minutes': Math.round(report.totalHours * 60),
-      'Working Days in Month': new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate(),
-      'Attendance Rate (%)': Math.round((report.totalDays / new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate()) * 100),
-      'Total Work Sessions': report.workLogs ? report.workLogs.length : 0,
-      'Completed Sessions': report.workLogs ? report.workLogs.filter(log => log.endTime).length : 0,
-      'Incomplete Sessions': report.workLogs ? report.workLogs.filter(log => !log.endTime).length : 0
-    }));
+    const summaryData = reports.map(report => {
+      const weekOffLogs = report.workLogs ? report.workLogs.filter(log => log.status === 'week_off') : [];
+      const workLogs = report.workLogs ? report.workLogs.filter(log => log.status !== 'week_off') : [];
+      
+      return {
+        'Employee Name': report.userName,
+        'Email': report.userEmail,
+        'Total Days Worked': report.totalDays,
+        'Total Hours': report.totalHours,
+        'Average Hours/Day': report.averageHoursPerDay,
+        'Total Minutes': Math.round(report.totalHours * 60),
+        'Working Days in Month': new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate(),
+        'Attendance Rate (%)': Math.round((report.totalDays / new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate()) * 100),
+        'Total Work Sessions': workLogs.length,
+        'Completed Sessions': workLogs.filter(log => log.endTime).length,
+        'Incomplete Sessions': workLogs.filter(log => !log.endTime).length,
+        'Week Off Days': weekOffLogs.length,
+        'Week Off Periods': getWeekOffPeriods(weekOffLogs)
+      };
+    });
     
     const summaryWS = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, summaryWS, 'Salary Summary');
@@ -105,6 +153,7 @@ export default function MonthlyReports() {
       const totalMinutes = Math.round(report.totalHours * 60);
       const workingDaysInMonth = new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0).getDate();
       const attendanceRate = (report.totalDays / workingDaysInMonth) * 100;
+      const weekOffLogs = report.workLogs ? report.workLogs.filter(log => log.status === 'week_off') : [];
       
       return {
         'Employee Name': report.userName,
@@ -115,15 +164,36 @@ export default function MonthlyReports() {
         'Total Hours': report.totalHours,
         'Total Minutes': totalMinutes,
         'Average Hours/Day': report.averageHoursPerDay,
-        'Total Work Sessions': report.workLogs ? report.workLogs.length : 0,
-        'Completed Sessions': report.workLogs ? report.workLogs.filter(log => log.endTime).length : 0,
-        'Incomplete Sessions': report.workLogs ? report.workLogs.filter(log => !log.endTime).length : 0,
-        'Salary Calculation Notes': `Based on ${report.totalDays} days worked out of ${workingDaysInMonth} working days (${Math.round(attendanceRate * 100) / 100}% attendance)`
+        'Total Work Sessions': report.workLogs ? report.workLogs.filter(log => log.status !== 'week_off').length : 0,
+        'Completed Sessions': report.workLogs ? report.workLogs.filter(log => log.status !== 'week_off' && log.endTime).length : 0,
+        'Incomplete Sessions': report.workLogs ? report.workLogs.filter(log => log.status !== 'week_off' && !log.endTime).length : 0,
+        'Week Off Days': weekOffLogs.length,
+        'Week Off Periods': getWeekOffPeriods(weekOffLogs),
+        'Salary Calculation Notes': `Based on ${report.totalDays} days worked out of ${workingDaysInMonth} working days (${Math.round(attendanceRate * 100) / 100}% attendance). Week off: ${weekOffLogs.length} days.`
       };
     });
     
     const salaryWS = XLSX.utils.json_to_sheet(salaryData);
     XLSX.utils.book_append_sheet(wb, salaryWS, 'Salary Calculation');
+    
+    // Week Off Summary Sheet
+    const weekOffSummaryData = reports.map(report => {
+      const weekOffLogs = report.workLogs ? report.workLogs.filter(log => log.status === 'week_off') : [];
+      const weekOffPeriods = getWeekOffPeriods(weekOffLogs);
+      
+      return {
+        'Employee Name': report.userName,
+        'Email': report.userEmail,
+        'Total Week Off Days': weekOffLogs.length,
+        'Week Off Periods': weekOffPeriods,
+        'Week Off Dates': weekOffLogs.map(log => log.date).join(', '),
+        'Week Off Days of Week': weekOffLogs.map(log => format(new Date(log.startTime), 'EEEE')).join(', '),
+        'Notes': weekOffLogs.length > 0 ? 'Week off periods marked by employee' : 'No week off days'
+      };
+    });
+    
+    const weekOffWS = XLSX.utils.json_to_sheet(weekOffSummaryData);
+    XLSX.utils.book_append_sheet(wb, weekOffWS, 'Week Off Summary');
     
     // Detailed daily logs for each employee
     reports.forEach(report => {
@@ -136,9 +206,9 @@ export default function MonthlyReports() {
           'End Time': log.endTime ? format(new Date(log.endTime), 'HH:mm:ss') : 'Not Ended',
           'Duration (minutes)': log.duration || 0,
           'Duration (hours)': log.duration ? `${Math.floor(log.duration / 60)}h ${log.duration % 60}m` : 'Not Calculated',
-          'Status': log.endTime ? 'Completed' : 'In Progress',
+          'Status': log.status === 'week_off' ? 'Week Off' : (log.endTime ? 'Completed' : 'In Progress'),
           'Session ID': log._id || `Session-${index + 1}`,
-          'Notes': log.endTime ? 'Full day completed' : 'Session not ended'
+          'Notes': log.status === 'week_off' ? 'Week off day' : (log.endTime ? 'Full day completed' : 'Session not ended')
         }));
         
         const detailedWS = XLSX.utils.json_to_sheet(detailedData);
@@ -160,7 +230,8 @@ export default function MonthlyReports() {
             'End Time': log.endTime ? format(new Date(log.endTime), 'HH:mm:ss') : 'Not Ended',
             'Duration (minutes)': log.duration || 0,
             'Duration (hours)': log.duration ? `${Math.floor(log.duration / 60)}h ${log.duration % 60}m` : 'Not Calculated',
-            'Status': log.endTime ? 'Completed' : 'In Progress'
+            'Status': log.status === 'week_off' ? 'Week Off' : (log.endTime ? 'Completed' : 'In Progress'),
+            'Week Off Note': log.status === 'week_off' ? 'Employee marked as unavailable' : ''
           });
         });
       }
@@ -169,6 +240,32 @@ export default function MonthlyReports() {
     if (allLogsData.length > 0) {
       const allLogsWS = XLSX.utils.json_to_sheet(allLogsData);
       XLSX.utils.book_append_sheet(wb, allLogsWS, 'All Daily Logs');
+    }
+    
+    // Week Off Details Sheet
+    const weekOffDetailsData = [];
+    reports.forEach(report => {
+      const weekOffLogs = report.workLogs ? report.workLogs.filter(log => log.status === 'week_off') : [];
+      weekOffLogs.forEach(log => {
+        weekOffDetailsData.push({
+          'Employee Name': report.userName,
+          'Email': report.userEmail,
+          'Week Off Date': log.date,
+          'Day of Week': format(new Date(log.startTime), 'EEEE'),
+          'Start Time': format(new Date(log.startTime), 'HH:mm:ss'),
+          'End Time': format(new Date(log.endTime), 'HH:mm:ss'),
+          'Duration (minutes)': log.duration,
+          'Duration (hours)': `${Math.floor(log.duration / 60)}h ${log.duration % 60}m`,
+          'Status': 'Week Off',
+          'Session ID': log._id,
+          'Notes': 'Employee marked this day as week off'
+        });
+      });
+    });
+    
+    if (weekOffDetailsData.length > 0) {
+      const weekOffDetailsWS = XLSX.utils.json_to_sheet(weekOffDetailsData);
+      XLSX.utils.book_append_sheet(wb, weekOffDetailsWS, 'Week Off Details');
     }
     
     // Save the file
